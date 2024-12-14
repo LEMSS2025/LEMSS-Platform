@@ -1,9 +1,0 @@
-pandas
-numpy
-ir-datasets
-torch
-transformers
-mlx-lm; platform_system == "Darwin"
-sentence-transformers
-accelerate
-pyserini
