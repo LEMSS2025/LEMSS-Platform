@@ -315,7 +315,7 @@
         },
         "llm": {
             "model_name": "google/gemma-2-9b-it",
-            "token": "<ADD TOKEN>",
+            "token": "<INSERT TOKEN>",
             "temperature": 0.5,
             "top_p": 0.9
         }
