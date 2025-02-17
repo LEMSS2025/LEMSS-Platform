@@ -1,5 +1,6 @@
 from LLMs.LLM import LLM
 from utils.logger import setup_logger
+
 from constants.constants import MLX_LLM_LOG_FILE, MLX_LLM_LOG_NAME
 
 
@@ -57,8 +58,8 @@ class MLXLLM(LLM):
                 from mlx_lm import generate
                 input_ids = self.__tokenizer.apply_chat_template(messages, add_generation_prompt=True)
                 formatted_prompt = self.__tokenizer.decode(input_ids)
-                result = generate(self.__model, self.__tokenizer, formatted_prompt, max_tokens, temp=self.temperature,
-                                  **self.__generate_flags)
+                result = generate(self.__model, self.__tokenizer, formatted_prompt, max_tokens=max_tokens,
+                                  temp=self.temperature, **self.__generate_flags)
             except Exception as e:
                 # Modify the messages for the second attempt
                 messages = [{"role": "user", "content": f"{system} {user}"}]
@@ -66,7 +67,7 @@ class MLXLLM(LLM):
                 try:
                     input_ids = self.__tokenizer.apply_chat_template(messages, add_generation_prompt=True)
                     formatted_prompt = self.__tokenizer.decode(input_ids)
-                    result = generate(self.__model, self.__tokenizer, formatted_prompt, max_tokens,
+                    result = generate(self.__model, self.__tokenizer, formatted_prompt, max_tokens=max_tokens,
                                       temp=self.temperature, **self.__generate_flags)
                 except Exception as e:
                     self.__logger.error(f"Error in generating prompt on second attempt: {e}")

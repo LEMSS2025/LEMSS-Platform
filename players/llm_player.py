@@ -13,7 +13,8 @@ class LLMPlayer(Player):
         to generate documents and process feedback across rounds.
     """
 
-    def __init__(self, name: str, character: str, prompt_format: str, query: str, feedback_func: callable):
+    def __init__(self, name: str, character: str, llm: LLM, prompt_format: str, query: str, query_id: int,
+                 init_document: str, feedback_func: callable):
         """
         Initialize a Player instance.
 
@@ -21,19 +22,20 @@ class LLMPlayer(Player):
         :param character: Character/persona the player will adopt.
         :param prompt_format: Format string for prompts.
         :param query: The query the player will be working with.
+        :param query_id: The ID of the query.
+        :param init_document: Initial document text for the player.
         :param feedback_func: Function to generate feedback for the player.
         """
-        super().__init__(name, character, prompt_format, query, feedback_func)
+        super().__init__(name, character, prompt_format, query, query_id, init_document, feedback_func)
+        self.__llm = llm
         self.prompt_manager = PromptManager(prompt_format)
         self.__logger = setup_logger(LLM_PLAYER_LOG_NAME, LLM_PLAYER_LOG_FILE)
 
-
-    def generate_document(self, llm: LLM, max_tokens: int, init_doc: str = None,
-                          force_max_tokens: bool = False) -> tuple:
+    def generate_document(self, max_tokens: int, init_doc: str = None,
+                          force_max_tokens: bool = False, ) -> tuple:
         """
         Generate a document based on the query and character using the specified LLM.
 
-        :param llm: The LLM instance used for generating the document.
         :param max_tokens: Maximum number of tokens for the generated document.
         :param init_doc: Initial document text, used in the first round.
         :param force_max_tokens: Whether to manually restrict the number of tokens in the generated document.
@@ -42,15 +44,16 @@ class LLMPlayer(Player):
         """
         try:
             non_cleaned_document, user_prompt, system_prompt = None, None, None
-            
+
             if self.round > 1:
-                user_prompt = self.prompt_manager.build_user_prompt(self.__pairwise_feedback, self.__all_feedback, self.query)
+                user_prompt = self.prompt_manager.build_user_prompt(self.__pairwise_feedback, self.__all_feedback,
+                                                                    self.query)
                 system_prompt = self.prompt_manager.build_system_prompt(self.query, self.document, self.character)
-                self.document, non_cleaned_document = llm.generate_prompt(user_prompt, system_prompt, max_tokens,
+                self.document, non_cleaned_document = self.__llm.generate_prompt(user_prompt, system_prompt, max_tokens,
                                                                           force_max_tokens=force_max_tokens)
             else:
                 system_prompt = self.prompt_manager.build_system_prompt(self.query, init_doc, self.character)
-                self.document, non_cleaned_document = llm.generate_prompt("", system_prompt, max_tokens,
+                self.document, non_cleaned_document = self.__llm.generate_prompt("", system_prompt, max_tokens,
                                                                           force_max_tokens=force_max_tokens)
 
             return self.document, non_cleaned_document, user_prompt, system_prompt

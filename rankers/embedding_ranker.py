@@ -1,8 +1,10 @@
+from abc import ABC
+
 from rankers.ranker import Ranker
 from utils.logger import setup_logger
 
-from abc import ABC
 from constants.constants import EMBEDDING_RANKER_LOG_FILE, EMBEDDING_RANKER_LOG_NAME
+
 
 class EmbeddingRanker(Ranker, ABC):
     """

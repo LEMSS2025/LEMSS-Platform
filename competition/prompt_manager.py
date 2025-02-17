@@ -3,7 +3,6 @@ import pandas as pd
 from constants.constants import NUM_TO_STR, HISTORY_ROUND_COLUMN, HISTORY_DOCUMENT_COLUMN, HISTORY_RANK_COLUMN
 
 
-# Rename it to PromptAgent
 class PromptManager:
     """
         Class responsible for building system and user prompts based on the provided format string and feedback data.
@@ -66,14 +65,19 @@ class PromptManager:
 
             prompt += f"\n\nquery: {query}\n\n"
             if _round == max_round:
-                prompt += f"* document: {round_pairwise.iloc[0][HISTORY_DOCUMENT_COLUMN]}\n\n{round_str} ranking: {round_pairwise.iloc[0][HISTORY_RANK_COLUMN]}\n\n\n"
-                prompt += f"* document: {round_pairwise.iloc[1][HISTORY_DOCUMENT_COLUMN]}\n\n{round_str} ranking: {round_pairwise.iloc[1][HISTORY_RANK_COLUMN]}\n\n\n"
+                prompt += (f"* document: {round_pairwise.iloc[0][HISTORY_DOCUMENT_COLUMN]}\n\n{round_str} "
+                           f"ranking: {round_pairwise.iloc[0][HISTORY_RANK_COLUMN]}\n\n\n")
+                prompt += (f"* document: {round_pairwise.iloc[1][HISTORY_DOCUMENT_COLUMN]}\n\n{round_str} "
+                           f"ranking: {round_pairwise.iloc[1][HISTORY_RANK_COLUMN]}\n\n\n")
             else:
-                prompt += f"* document: {round_pairwise.iloc[0][HISTORY_DOCUMENT_COLUMN]}\n\n{round_str} to latest ranking: {round_pairwise.iloc[0][HISTORY_RANK_COLUMN]}\n\n\n"
+                prompt += (f"* document: {round_pairwise.iloc[0][HISTORY_DOCUMENT_COLUMN]}\n\n{round_str} "
+                           f"to latest ranking: {round_pairwise.iloc[0][HISTORY_RANK_COLUMN]}\n\n\n")
                 if _round == min_round:
-                    prompt += f"* document: {round_pairwise.iloc[1][HISTORY_DOCUMENT_COLUMN]}\n\n{round_str} to latest ranking: {round_pairwise.iloc[1][HISTORY_RANK_COLUMN]}"
+                    prompt += (f"* document: {round_pairwise.iloc[1][HISTORY_DOCUMENT_COLUMN]}\n\n{round_str} "
+                               f"to latest ranking: {round_pairwise.iloc[1][HISTORY_RANK_COLUMN]}")
                 else:
-                    prompt += f"* document: {round_pairwise.iloc[1][HISTORY_DOCUMENT_COLUMN]}\n\n{round_str} to latest ranking: {round_pairwise.iloc[1][HISTORY_RANK_COLUMN]}\n\n\n"
+                    prompt += (f"* document: {round_pairwise.iloc[1][HISTORY_DOCUMENT_COLUMN]}\n\n{round_str} "
+                               f"to latest ranking: {round_pairwise.iloc[1][HISTORY_RANK_COLUMN]}\n\n\n")
 
         return prompt
 
@@ -94,12 +98,14 @@ class PromptManager:
             round_str = NUM_TO_STR[max_round - _round + 1]
 
             if _round == max_round:
-                prompt += f"* documents ordered by {round_str} ranking from highest to lowest in relation to the query:\n\n\n"
+                prompt += (f"* documents ordered by {round_str} ranking from highest to lowest in relation "
+                           f"to the query:\n\n\n")
 
                 for _, row in round_all.iterrows():
                     prompt += f"* {row[HISTORY_DOCUMENT_COLUMN]}\n\n\n"
             else:
-                prompt += f"* documents ranked by {round_str} to latest ranking from highest to lowest in relation to the query:\n"
+                prompt += (f"* documents ranked by {round_str} to latest ranking from highest to lowest in relation "
+                           f"to the query:\n")
                 for _, row in round_all.iterrows():
                     prompt += f"{row[HISTORY_RANK_COLUMN]}. {row[HISTORY_DOCUMENT_COLUMN]}\n"
 

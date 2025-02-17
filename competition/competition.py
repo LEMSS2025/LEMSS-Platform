@@ -1,23 +1,23 @@
-import pandas as pd
 import os
 import shutil
 
-from utils.logger import setup_logger
+import pandas as pd
+
+from agents.LLM_agent import LLMAgent
+from agents.static_agent import StaticAgent
+from competition.game import Game
+from competition.warm_start import WarmStart
 from parsers.query_parser import QueryParser
 from parsers.trec_parser import TrecParser
-from rankers.e5 import E5
 from rankers.contriever import Contriever
+from rankers.e5 import E5
 from rankers.okapi import Okapi
-from LLMs.hugging_face_llm import HuggingFaceLLM
-from LLMs.mlx_llm import MLXLLM
-from agents.LLM_agent import LLMAgent
-from competition.game import Game
-from constants.constants import (COMPETITION_LOG_FILE, COMPETITION_LOG_NAME,
-                                 CONFIG_COMPETITION_HEADER, CONFIG_AGENTS_HEADER, CONFIG_GAME_HEADER, CONFIG_INIT_DOCS_PATH_HEADER,
-                                 CONFIG_RANKERS_HEADER, CONFIG_ROUND_BY_ROUND_HEADER, CONFIG_LLM_HEADER, CONFIG_LLM_MODEL_NAME_HEADER,
-                                 CONFIG_GAME_ROUNDS_HEADER,
-                                 HISTORY_ROUND_COLUMN, HISTORY_PLAYER_COLUMN, HISTORY_DOCNO_COLUMN, HISTORY_QUERY_ID_COLUMN, HISTORY_DOCUMENT_COLUMN,
-                                 MLX_IDENTIFIER, COMPETITION_HISTORY_FILE_NAME, TRECTEXT_FILE_NAME)
+from utils.logger import setup_logger
+from constants.constants import (COMPETITION_HISTORY_FILE_NAME, COMPETITION_LOG_FILE, COMPETITION_LOG_NAME,
+    CONFIG_AGENTS_HEADER, CONFIG_COMPETITION_HEADER, CONFIG_GAME_HEADER,CONFIG_GAME_ROUNDS_HEADER,
+    CONFIG_INIT_DOCS_PATH_HEADER, QUERIES_DF_PATH_HEADER, CONFIG_RANKERS_HEADER, CONFIG_ROUND_BY_ROUND_HEADER,
+    HISTORY_DOCNO_COLUMN, HISTORY_DOCUMENT_COLUMN, HISTORY_PLAYER_COLUMN, HISTORY_QUERY_ID_COLUMN, HISTORY_ROUND_COLUMN,
+    TRECTEXT_FILE_NAME)
 
 
 class Competition:
@@ -35,9 +35,15 @@ class Competition:
         self.__competition_config = config[CONFIG_COMPETITION_HEADER]
         self.__agents_config = config[CONFIG_AGENTS_HEADER]
         self.__game_config = config[CONFIG_GAME_HEADER]
+        self.__warm_start = config[CONFIG_COMPETITION_HEADER]['warm_start']
+        if self.__warm_start:
+            self.__warm_start = WarmStart(
+                config[CONFIG_COMPETITION_HEADER]['warm_start_path'])
         self.__games_history = []
+        self.__agents = []
         self.__index_based_ranker = False
-        self.__logger = setup_logger(COMPETITION_LOG_NAME, COMPETITION_LOG_FILE)
+        self.__logger = setup_logger(
+            COMPETITION_LOG_NAME, COMPETITION_LOG_FILE)
 
     def __setup_competition(self):
         """
@@ -46,7 +52,6 @@ class Competition:
         try:
             self.__setup_queries()
             self.__setup_ranker()
-            self.__setup_llm()
             self.__setup_agents()
             self.__setup_games()
         except KeyError as e:
@@ -58,7 +63,10 @@ class Competition:
         Load the queries from the specified path.
         """
         try:
-            self.__queries_df = QueryParser(**self.__competition_config[CONFIG_INIT_DOCS_PATH_HEADER]).query_loader()
+            if self.__competition_config[QUERIES_DF_PATH_HEADER]:
+                self.__queries_df = pd.read_csv(self.__competition_config[QUERIES_DF_PATH_HEADER])
+            else:
+                self.__queries_df = QueryParser(**self.__competition_config[CONFIG_INIT_DOCS_PATH_HEADER]).query_loader()
             self.__logger.info("Queries loaded successfully.")
         except KeyError as e:
             self.__logger.error(f"Missing competition configuration key: {e}")
@@ -86,28 +94,21 @@ class Competition:
             self.__logger.error(f"Missing ranker configuration key: {e}")
             raise
 
-    def __setup_llm(self):
-        """
-        Set up the LLM (Large Language Model) based on the configuration.
-        """
-        try:
-            if MLX_IDENTIFIER in self.__competition_config[CONFIG_LLM_HEADER][CONFIG_LLM_MODEL_NAME_HEADER]:
-                self.llm = MLXLLM(**self.__competition_config[CONFIG_LLM_HEADER])
-            else:
-                self.llm = HuggingFaceLLM(**self.__competition_config[CONFIG_LLM_HEADER])
-
-            self.__logger.info("LLM initialized successfully")
-        except KeyError as e:
-            self.__logger.error(f"Missing LLM configuration key: {e}")
-            raise
-
     def __setup_agents(self):
         """
         Initialize the agents for the competition.
         """
         try:
-            self.__agents = [LLMAgent(name=agent, **self.__agents_config[agent], queries_df=self.__queries_df)
-                             for agent in self.__agents_config]
+            for agent_name, agent_config in self.__agents_config.items():
+                if agent_config['agent_type'] == 'llm':
+                    agent_config.pop('agent_type')
+                    agent = LLMAgent(name=agent_name, **agent_config, queries_df=self.__queries_df,
+                                     warm_start=self.__warm_start)
+                elif agent_config['agent_type'] == 'static':
+                    agent_config.pop('agent_type')
+                    agent = StaticAgent(name=agent_name, queries_df=self.__queries_df, warm_start=self.__warm_start)
+
+                self.__agents.append(agent)
             self.__logger.info(f"{len(self.__agents)} agents initialized successfully.")
         except KeyError as e:
             self.__logger.error(f"Error initializing agents: {e}")
@@ -120,7 +121,7 @@ class Competition:
         try:
             self.__rounds = self.__game_config[CONFIG_GAME_ROUNDS_HEADER]
             self.__games = {query_id: Game(query_info=query_info, agents=self.__agents, ranker=self.ranker,
-                                           llm=self.llm, **self.__game_config)
+                                           **self.__game_config, warm_start=self.__warm_start)
                             for query_id, query_info in self.__queries_df.iterrows()}
             self.__logger.info(f"{len(self.__games)} games initialized successfully.")
         except KeyError as e:
@@ -136,13 +137,13 @@ class Competition:
         """
         try:
             trec_parser = TrecParser([combined_history])
-
             agents_mapping = trec_parser.create_agent_mapping()
 
-            combined_history[HISTORY_DOCNO_COLUMN] = combined_history.apply(lambda row: f"ROUND-{row[HISTORY_ROUND_COLUMN]:02d}-{row[HISTORY_QUERY_ID_COLUMN]}-{agents_mapping[row[HISTORY_PLAYER_COLUMN]]:02d}", axis=1)
+            combined_history[HISTORY_DOCNO_COLUMN] = combined_history.apply(
+                lambda row: f"ROUND-{row[HISTORY_ROUND_COLUMN]:02d}-{row[HISTORY_QUERY_ID_COLUMN]}"
+                            f"-{agents_mapping[row[HISTORY_PLAYER_COLUMN]]:02d}", axis=1)
             combined_history.to_csv(os.path.join(output_folder, COMPETITION_HISTORY_FILE_NAME), index=False)
             self.__logger.info("Competition history saved successfully.")
-
 
             trec_parser.create_trectext(os.path.join(output_folder, TRECTEXT_FILE_NAME))
             self.__logger.info("TREC text file created successfully.")
@@ -156,7 +157,20 @@ class Competition:
         """
         try:
             # Iterate through each round
-            for round_number in range(1, self.__rounds + 1):
+            if self.__warm_start:
+                last_query_id, last_round = self.__warm_start.get_last_run()
+                first_round = last_round + 1
+                self.__games_history = []
+
+                # Init the game history for the last run
+                for game in self.__games:
+                    self.__games_history.append(self.__games[game].get_game_history())
+
+                self.__logger.info(f"Resuming competition from query ID: {last_query_id}, round: {last_round}")
+            else:
+                first_round = 1
+
+            for round_number in range(first_round, self.__rounds + 1):
                 # Initialize storage for the documents and round data
                 round_dfs = []
                 documents_prompts = []
@@ -172,10 +186,9 @@ class Competition:
                         for player_id, player in enumerate(self.__agents):
                             docno = f"{game}-{round_number}-{player_id}"
                             document = documents_prompts[game][player_id][0]
-                            documents_df = pd.concat(
-                                [documents_df, pd.DataFrame({HISTORY_DOCNO_COLUMN: docno, HISTORY_DOCUMENT_COLUMN: document}, index=[0])],
-                                ignore_index=True
-                            )
+                            documents_df = pd.concat([documents_df, pd.DataFrame(
+                                    {HISTORY_DOCNO_COLUMN: docno, HISTORY_DOCUMENT_COLUMN: document}, index=[0])],
+                                ignore_index=True)
 
                     # Add the documents to the index
                     self.ranker.add_document(documents_df)
@@ -185,7 +198,8 @@ class Competition:
                     # Rank players based on the documents generated
                     if self.__index_based_ranker:
                         # Find the document IDs for the current game
-                        docnos = documents_df[documents_df[HISTORY_DOCNO_COLUMN].apply(lambda x: x.split("-")[0]) == str(game)].docno.tolist()
+                        docnos = documents_df[documents_df[HISTORY_DOCNO_COLUMN].apply(
+                            lambda x: x.split("-")[0]) == str(game)].docno.tolist()
                         ranked_players = self.__games[game].rank_documents(documents_prompts[idx], docnos)
                     else:
                         ranked_players = self.__games[game].rank_documents(documents_prompts[idx])
@@ -210,7 +224,8 @@ class Competition:
                         self.__games_history[idx] = self.__games[game].get_game_history()
 
         except Exception as e:
-            self.__logger.error(f"Error running round-by-round competition: {e}")
+            self.__logger.error(
+                f"Error running round-by-round competition: {e}")
             raise
 
     def game_by_game_competition(self):
@@ -237,10 +252,9 @@ class Competition:
                     for player_id, player in enumerate(self.__agents):
                         docno = f"{round_number}-{player_id}"
                         document = documents_prompts[player_id][0]
-                        documents_df = pd.concat(
-                            [documents_df, pd.DataFrame({HISTORY_DOCNO_COLUMN: docno, HISTORY_DOCUMENT_COLUMN: document}, index=[0])],
-                            ignore_index=True
-                        )
+                        documents_df = pd.concat([documents_df, pd.DataFrame(
+                                {HISTORY_DOCNO_COLUMN: docno, HISTORY_DOCUMENT_COLUMN: document}, index=[0])],
+                            ignore_index=True)
 
                     # Add the documents to the index
                     self.ranker.add_document(documents_df)

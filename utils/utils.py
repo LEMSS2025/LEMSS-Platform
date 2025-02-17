@@ -5,6 +5,7 @@ import datetime
 
 from constants.constants import OUTPUTS_DIR, CONFIG_FILE_NAME
 
+
 def create_competition_folder(config):
     """
     Create a folder for the competition based on the configuration.

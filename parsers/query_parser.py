@@ -23,7 +23,8 @@ class QueryParser:
         """
         # Load XML files from the queries folder
         queries_folder_path = os.path.join(PROJECT_DIR, queries_folder_path)
-        self.__files = [os.path.join(PROJECT_DIR, queries_folder_path, file) for file in os.listdir(queries_folder_path) if file.endswith('.xml')]
+        self.__files = [os.path.join(PROJECT_DIR, queries_folder_path, file) for file in os.listdir(queries_folder_path)
+                        if file.endswith('.xml')]
 
         # Raise an error if no XML files are found
         if not self.__files:
@@ -45,7 +46,7 @@ class QueryParser:
                 tree = ET.parse(file_path)
                 root = tree.getroot()
                 for topic in root.findall(XML_TOPIC_HEADER):
-                    qid = topic.get(XML_NUMBER_HEADER).zfill(3)
+                    qid = topic.get(XML_NUMBER_HEADER)
                     query_text = topic.find(XML_QUERY_HEADER).text.strip()
                     queries[qid] = {QUERY_DF_QUERY_COLUMN: query_text}
             except ET.ParseError as e:
@@ -53,6 +54,8 @@ class QueryParser:
             except Exception as e:
                 self.__logger.error(f"Unexpected error processing file {file_path}: {e}")
 
+        max_query = max(map(int, queries.keys()))
+        queries = {qid.zfill(len(str(max_query))): queries[qid] for qid in queries}
         return queries
 
     def __parse_trectext(self) -> pd.DataFrame:
@@ -94,7 +97,8 @@ class QueryParser:
         queries = self.__parse_queries()
         docs = self.__parse_trectext()
 
-        docs[QUERY_DF_QUERY_COLUMN] = docs[QUERY_DF_QUERY_ID_COLUMN].apply(lambda x: queries.get(x, {}).get(QUERY_DF_QUERY_COLUMN, ''))
+        docs[QUERY_DF_QUERY_COLUMN] = docs[QUERY_DF_QUERY_ID_COLUMN].apply(lambda x: queries.get(
+            x, {}).get(QUERY_DF_QUERY_COLUMN, ''))
         if docs[QUERY_DF_QUERY_COLUMN].isnull().any():
             self.__logger.warning("Some documents do not have corresponding queries.")
 

@@ -6,6 +6,7 @@ from rankers.embedding_ranker import EmbeddingRanker
 from utils.logger import setup_logger
 from constants.constants import E5_LOG_FILE, E5_LOG_NAME
 
+
 class E5(EmbeddingRanker):
     """
         E5 Ranker class that ranks documents based on their similarity to a given query using a SentenceTransformer model.

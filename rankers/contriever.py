@@ -51,7 +51,8 @@ class Contriever(EmbeddingRanker):
             self.__logger.info(f"Ranking {len(documents)} documents for query: {query}")
 
             # Apply tokenization and encoding to the input documents and query
-            docs_tokens = self.__tokenizer(list(documents), padding=True, truncation=True, return_tensors='pt').to(self.device)
+            docs_tokens = (self.__tokenizer(list(documents), padding=True, truncation=True, return_tensors='pt').
+                           to(self.device))
             query_token = self.__tokenizer(query, padding=True, truncation=True, return_tensors='pt').to(self.device)
 
             # Mean pooling to get sentence embeddings

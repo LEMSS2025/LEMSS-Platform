@@ -17,7 +17,8 @@ class Okapi(IndexRanker):
         super().__init__("Okapi", index_name)
         self.__logger = setup_logger(OKAPI_RANKER_LOG_NAME, OKAPI_RANKER_LOG_FILE)
         self.set_index_path(index_name, output_hash_folder)
-        self.__indexer_args = ["-index", self.index_path, "-storeDocvectors", "-storeContents", "-stemmer", "krovetz", "-keepStopwords"]
+        self.__indexer_args = ["-index", self.index_path, "-storeDocvectors", "-storeContents", "-stemmer", "krovetz",
+                               "-keepStopwords"]
 
         if init_index:
             self.initialize_index()
@@ -101,7 +102,8 @@ class Okapi(IndexRanker):
             scores = []
             for docno in docnos:
                 # Compute BM25 score for each document
-                bm25_score = index_reader.compute_bm25_term_weight(docno, query, analyzer=get_lucene_analyzer(stemmer='krovetz'))
+                bm25_score = index_reader.compute_bm25_term_weight(docno, query,
+                                                                   analyzer=get_lucene_analyzer(stemmer='krovetz'))
                 scores.append(bm25_score)
 
             # Use the base class's tie breaker to rank documents

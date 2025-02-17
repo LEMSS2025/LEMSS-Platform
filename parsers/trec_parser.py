@@ -2,7 +2,8 @@ import pandas as pd
 
 from utils.logger import setup_logger
 from constants.constants import (TREC_PARSER_LOG_FILE, TREC_PARSER_LOG_NAME,
-                                 HISTORY_PLAYER_COLUMN, HISTORY_ROUND_COLUMN, HISTORY_QUERY_ID_COLUMN, HISTORY_DOCUMENT_COLUMN)
+                                 HISTORY_PLAYER_COLUMN, HISTORY_ROUND_COLUMN, HISTORY_QUERY_ID_COLUMN,
+                                 HISTORY_DOCUMENT_COLUMN)
 
 
 class TrecParser:

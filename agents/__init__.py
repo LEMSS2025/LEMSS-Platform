@@ -2,5 +2,6 @@
 
 from .agent import Agent
 from .LLM_agent import LLMAgent
+from .static_agent import StaticAgent
 
-__all__ = ['LLMAgent', 'Agent']
+__all__ = ['LLMAgent', 'Agent', 'StaticAgent']

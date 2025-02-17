@@ -29,13 +29,9 @@ class HuggingFaceLLM(LLM):
 
         try:
             # Load model for other devices using the Hugging Face pipeline
-            self.__model = transformers.pipeline(
-                "text-generation",
-                model=self.model_name,
-                model_kwargs={"torch_dtype": torch.bfloat16},
-                device_map="auto",
-                token=self.token,
-            )
+            self.__model = transformers.pipeline("text-generation", model=self.model_name,
+                                                 model_kwargs={"torch_dtype": torch.bfloat16}, device_map="auto",
+                                                 token=self.token)
             self.__tokenizer = transformers.AutoTokenizer.from_pretrained(self.model_name)
         except Exception as e:
             self.__logger.error(f"Error initializing hugging face model: {e}")
@@ -63,25 +59,15 @@ class HuggingFaceLLM(LLM):
 
             # Generate text based on device type
             try:
-                result = self.__model(
-                    messages,
-                    max_new_tokens=max_tokens,
-                    temperature=self.temperature,
-                    do_sample=True,
-                    **self.__generate_flags
-                )[0]['generated_text'][-1]["content"]
+                result = self.__model(messages, max_new_tokens=max_tokens, temperature=self.temperature, do_sample=True,
+                                      **self.__generate_flags)[0]['generated_text'][-1]["content"]
             except Exception as e:
                 # Modify the messages for the second attempt
                 messages = [{"role": "user", "content": f"{system} {user}"}]
 
                 try:
-                    result = self.__model(
-                        messages,
-                        max_new_tokens=max_tokens,
-                        temperature=self.temperature,
-                        do_sample=True,
-                        **self.__generate_flags
-                    )[0]['generated_text'][-1]["content"]
+                    result = self.__model(messages, max_new_tokens=max_tokens, temperature=self.temperature,
+                                          do_sample=True, **self.__generate_flags)[0]['generated_text'][-1]["content"]
                 except Exception as e:
                     self.__logger.error(f"Error in generating prompt on second attempt: {e}")
                     raise
