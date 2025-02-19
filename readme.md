@@ -53,8 +53,8 @@
 5. **Large Language Model Integration**  
    Leverages powerful LLMs (Large Language Models) like Llama to generate document tailored to improve rankings. These models can be configured with specific parameters, such as temperature and token limits, to produce optimized results.
 
-6. **TREC Text Parsing and Management**  
-   Facilitates the extraction and management of documents and queries from TREC text files. This feature ensures that relevant data is accurately parsed and prepared for use in the competition.
+6. **Warm-Start Mechanism**  
+    Supports a warm-start mechanism that initializes the competition with pre-generated documents, allowing agents to start from a known state. This feature is useful for seeding the competition with initial data or for testing specific scenarios. This mechanism can be used to resume the competition from a previous state.
 
 7. **Automated Game History Logging**  
    Automatically logs each stage of the competition, including document generations, rankings, and feedback. This logging is crucial for transparency and allows for detailed post-competition analysis.
@@ -82,12 +82,14 @@
     ├── agents
     │   ├── LLM_agent.py
     │   ├── __init__.py
-    │   └── agent.py
+    │   ├── agent.py
+    │   └── static_agent.py
     ├── competition
     │   ├── __init__.py
     │   ├── competition.py
     │   ├── game.py
-    │   └── prompt_manager.py
+    │   ├── prompt_manager.py
+    │   └── warm_start.py
     ├── constants
     │   ├── __init__.py
     │   └── constants.py
@@ -116,7 +118,8 @@
     ├── players
     │   ├── __init__.py
     │   ├── llm_player.py
-    │   └── player.py
+    │   ├── player.py
+    │   └── static_player.py
     ├── rankers
     │   ├── __init__.py
     │   ├── contriever.py
@@ -156,6 +159,7 @@
 | ---                            | ---                             |
 | [LLM_agent.py](agents/LLM_agent.py) | Implements an agent that utilizes large language models (LLMs) for generating and ranking documents. |
 | [agent.py](agents/agent.py)    | Provides an abstract base class for defining agents in the competition, including methods for generating and ranking documents. |
+| [static_agent.py](agents/static_agent.py) | Implements an agent that generates static documents based on predefined templates. |
 
 </details>
 
@@ -166,6 +170,7 @@
 | [game.py](competition/game.py)                     | Orchestrates the execution of individual game rounds, handling document generation, ranking, and feedback. |
 | [competition.py](competition/competition.py)       | Manages the overall competition setup, execution, and aggregation of game histories across multiple agents. |
 | [prompt_manager.py](competition/prompt_manager.py) | Manages the construction of system and user prompts for guiding the LLMs in document generation. |
+| [warm_start.py](competition/warm_start.py)         | Implements a warm-start mechanism for initializing the competition with pre-generated documents. |
 
 </details>
 
@@ -302,66 +307,65 @@
 `config.json` default template
 ```json
 {
-    "competition": {
-        "round_by_round": true,
-        "init_docs_path": {
-            "queries_folder_path": "data/web_track",
-            "docs_file_path": "data/initial_documents.trectext"
-        },
-        "rankers": {
-            "contriever": {
-                "model_name": "facebook/contriever"
-            }
-        },
-        "llm": {
-            "model_name": "google/gemma-2-9b-it",
-            "token": "<INSERT TOKEN>",
-            "temperature": 0.5,
-            "top_p": 0.9
-        }
+  "competition": {
+    "warm_start": false,
+    "warm_start_path": null,
+    "queries_df_path": null,
+    "round_by_round": true,
+    "init_docs_path": {
+      "queries_folder_path": "data/web_track",
+      "docs_file_path": "data/initial_documents.trectext"
     },
-    "game": {
-        "max_tokens": 256,
-        "rounds": 30,
-        "force_max_tokens": true
-    },
-    "agents": {
-        "student": {
-            "character": "behave like a BSc student",
-            "prompt_format": "Edit the candidate document to improve its search engine ranking for the candidate query, aiming for the highest rank (1 being the highest). Use the black box search engine's past rankings over various queries, provided as context by the user, to guide your edits. Focus on editing the most impactful sentences to enhance ranking potential. Target an edited document length of around 147 words, not exceeding 150 words. Ensure the edited document is very similar to the candidate document. Generate only the edited document, without additional comments or titles.\n",
-            "pairwise": true,
-            "depth": 3
-        },
-        "writer": {
-            "character": "behave like a professional writer",
-            "prompt_format": "Edit the candidate document to improve its search engine ranking for the candidate query, aiming for the highest rank (1 being the highest). Use the black box search engine's past rankings over various queries, provided as context by the user, to guide your edits. Focus on editing the most impactful sentences to enhance ranking potential. Target an edited document length of around 147 words, not exceeding 150 words. Ensure the edited document is very similar to the candidate document. Generate only the edited document, without additional comments or titles.\n",
-            "pairwise": true,
-            "depth": 3
-        },
-        "editor": {
-            "character": "behave like a professional editor",
-            "prompt_format": "Edit the candidate document to improve its search engine ranking for the candidate query, aiming for the highest rank (1 being the highest). Use the black box search engine's past rankings over various queries, provided as context by the user, to guide your edits. Focus on editing the most impactful sentences to enhance ranking potential. Target an edited document length of around 147 words, not exceeding 150 words. Ensure the edited document is very similar to the candidate document. Generate only the edited document, without additional comments or titles.\n",
-            "pairwise": true,
-            "depth": 3
-        },
-        "teacher": {
-            "character": "behave like an English teacher",
-            "prompt_format": "Edit the candidate document to improve its search engine ranking for the candidate query, aiming for the highest rank (1 being the highest). Use the black box search engine's past rankings over various queries, provided as context by the user, to guide your edits. Focus on editing the most impactful sentences to enhance ranking potential. Target an edited document length of around 147 words, not exceeding 150 words. Ensure the edited document is very similar to the candidate document. Generate only the edited document, without additional comments or titles.\n",
-            "pairwise": true,
-            "depth": 3
-        },
-        "professor": {
-            "character": "behave like a Data Science professor",
-            "prompt_format": "Edit the candidate document to improve its search engine ranking for the candidate query, aiming for the highest rank (1 being the highest). Use the black box search engine's past rankings over various queries, provided as context by the user, to guide your edits. Focus on editing the most impactful sentences to enhance ranking potential. Target an edited document length of around 147 words, not exceeding 150 words. Ensure the edited document is very similar to the candidate document. Generate only the edited document, without additional comments or titles.\n",
-            "pairwise": true,
-            "depth": 3
-        }
+    "rankers": {
+      "e5": {
+        "model_name": "intfloat/e5-large-unsupervised"
+      }
     }
+  },
+  "game": {
+    "max_tokens": 200,
+    "rounds": 4,
+    "force_max_tokens": false
+  },
+  "agents": {
+    "llm-gemma": {
+      "agent_type": "llm",
+      "llm": {
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "token": "<INSERT TOKEN>",
+        "temperature": 0.7,
+        "top_p": 0.95
+      },
+      "character": "behave like a BSc student",
+      "prompt_format": "Edit the candidate document to improve its search engine ranking for the candidate query, aiming for the highest rank (1 being the highest). Use the black box search engine's past rankings over various queries, provided as context by the user, to guide your edits. Focus on editing the most impactful sentences to enhance ranking potential. Target an edited document length of around 147 words, not exceeding 150 words. Ensure the edited document is very similar to the candidate document. Generate only the edited document, without additional comments or titles. Don't use a duplicate of another participant's document. Documents that practice this technique will be penalized. However, you are permitted to copy paste parts of documents that other participants have written, As long as the originality of your document is remained.\n",
+      "pairwise": true,
+      "depth": 1
+    },
+    "llm-llama": {
+      "agent_type": "llm",
+      "llm": {
+        "model_name": "google/gemma-2-9b-it",
+        "token": "<INSERT TOKEN>",
+        "temperature": 0.7,
+        "top_p": 0.95
+      },
+      "character": "behave like a BSc student",
+      "prompt_format": "Edit the candidate document to improve its search engine ranking for the candidate query, aiming for the highest rank (1 being the highest). Use the black box search engine's past rankings over various queries, provided as context by the user, to guide your edits. Focus on editing the most impactful sentences to enhance ranking potential. Target an edited document length of around 147 words, not exceeding 150 words. Ensure the edited document is very similar to the candidate document. Generate only the edited document, without additional comments or titles. Don't use a duplicate of another participant's document. Documents that practice this technique will be penalized. However, you are permitted to copy paste parts of documents that other participants have written, As long as the originality of your document is remained.\n",
+      "pairwise": true,
+      "depth": 1
+    },
+    "static": {
+      "agent_type": "static"
+    }
+  }
 }
 ```
 
 ### competition:
-- `competition`: 
+- `competition`:
+    - `warm_start`: Boolean value to determine if the competition should be initialized with pre-generated documents.
+    - `warm_start_path`: Path to the competition history csv file to be used for warm-start.
+    - `queries_df_path`: Path to the queries dataframe file (instead of init_docs_path)
     - `round_by_round`: Boolean value to determine if the competition should be executed round-by-round or game-by-game.
     - `init_docs_path`: Path to the initial documents and queries folder.
     - `rankers`: Ranker settings for the competition (there are currently three types of rankers: `contriever`, `e5`, and `okapi`. other rankers can be easily implemented into our code-base).
@@ -371,13 +375,6 @@
             - `model_name`: The hugging face link to the E5 model.
         3. `okapi`: Okapi ranker settings (it uses wikir/en59k as corpus):
             - `index_name`: The name for the index folder to be created.
-        
-    - `llm`: Large Language Model (LLM) configuration settings.
-        - `model_name`: The hugging face link to the LLM model.
-        - `token`: Hugging face token for LLM generation.
-        - `temperature`: Temperature parameter for LLM generation.
-        - `top_p`: Top-p parameter for LLM generation.
-        - You can add any other LLM parameters here that is part of the model Hugging Face model.
       
 ### game:
 - `game`: 
@@ -388,14 +385,19 @@
 ### agents:
 - `agents`: 
     - `<name of the agent>`: Name of the agent.
-        - `character`: Description of the agent's character.
-        - `prompt_format`: The prompt format for the agent.
-        - `pairwise`: Boolean value to determine if pairwise or listwise feedback should be provided.
-        - `depth`: Depth of the pairwise/ listwise feedback (how many previous rounds should be considered).
+      - `agent_type`: Type of the agent (`llm` or `static` or any other agent type).
+      - `llm`: LLM settings for the agent.
+            - `model_name`: The hugging face link to the LLM model.
+            - `token`: The token for the LLM model.
+            - `temperature`: The temperature value for the LLM model.
+            - `top_p`: The top_p value for the LLM model.
+            - You can add any other LLM parameters here that is part of the model Hugging Face model.
+          - `character`: Description of the agent's character.
+          - `prompt_format`: The prompt format for the agent.
+          - `pairwise`: Boolean value to determine if pairwise or listwise feedback should be provided.
+          - `depth`: Depth of the pairwise/ listwise feedback (how many previous rounds should be considered).
+      - `static`: Static agent settings.
     - You can add unlimited amount of agents with different settings.
-
-
-
 ---
 
 ##  Project Roadmap
